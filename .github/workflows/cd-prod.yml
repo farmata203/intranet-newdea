@@ -1,0 +1,57 @@
+name: "CD Pipeline - Prod"
+
+on:
+  push:
+    branches:
+      - prod
+
+env:
+  IMAGE_NAME: intranet-newdeal
+  IMAGE_TAG: latest
+  DOCKER_REGISTRY: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/intranet-newdeal:latest
+          format: table
+          severity: CRITICAL
+          exit-code: '1'
+          vuln-type: os,library
+          ignore-unfixed: true
+
+  deploy:
+    needs: scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | \
+          docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Pull image
+        run: docker pull $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+      - name: Stop existing container
+        run: docker stop intranet-app || true
+
+      - name: Remove old container
+        run: docker rm intranet-app || true
+
+      - name: Deploy new container
+        run: |
+          docker run -d \
+            -p 80:80 \
+            --name intranet-app \
+            --restart always \
+            $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+      - name: Verify deployment
+        run: docker ps | grep intranet-app
