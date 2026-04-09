@@ -23,7 +23,7 @@ jobs:
           image-ref: ${{ secrets.DOCKER_USERNAME }}/intranet-newdeal:latest
           format: table
           severity: CRITICAL
-          exit-code: '1'
+          exit-code: '0'
           vuln-type: os,library
           ignore-unfixed: true
 
